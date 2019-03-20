@@ -121,16 +121,12 @@ int safety(number_customers){
     for(i = 0; i < n; i++){
         for(j = 0; j < m; j++){
             if(need[i][j] <= work[i] && finish[i] == 0){
-                work[i] = work[i] + allocation[i][j];
-                finish[i] = 1;
+                for(k = 0; k < m; k++){
+                    work[i] += allocation[i][k];
+                    finish[i] = 1;
+                }
             }
         }
-    }
-    for(i = 0; i < m; i++){
-        printf("Work: %d\n", work[i]);
-    }
-    for(i = 0; i < n; i++){
-        printf("Finish: %d\n", finish[i]);
     }
     //if any processes are false, returns 1 to say that the process isn't safe
     for(i = 0; i < n; i++){
