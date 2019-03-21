@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 
 #define NUM_RESOURCES 3
 
@@ -19,20 +20,22 @@ void printMatrix(int **arr, int size);
 void* customer(void *arg);
 int requestResources(int customerNum, int request[]);
 int releaseResources(int customerNum, int release[]);
-int safety(int number_customers);
+int isSafe(int **need, int** allocation, int** maximum, int number_customers);
+void findNeed(int **need, int **allocation, int **maximum, int number_customers);
 
 struct{
     int number_customers;
 }customerArgs;
 
-/* This will dynamically allocate a two dimensional array, with the user defined number of customers (processes) being one dimension, and the statically
- defined number of resources being the other. *** is used because the address of a 2d array is being passed into function, so that a copy of the 2d array is not 
- created instead */
+
 
 void setArraySize(int **arr, int size){
     int i;
-    *arr = malloc(size * sizeof(int));
+    *arr = calloc(size, sizeof(int));
 }
+/* This will dynamically allocate a two dimensional array, with the user defined number of customers (processes) being one dimension, and the statically
+ defined number of resources being the other. *** is used because the address of a 2d array is being passed into function, so that a copy of the 2d array is not 
+ created instead */
 void setMatrixSize(int ***arr, int size){
     int i;
     *arr = malloc(size * sizeof(int *));
@@ -40,8 +43,9 @@ void setMatrixSize(int ***arr, int size){
         fprintf(stderr, "no memory available\n");
         return;
     }
+    //if arr[i] is null, clean up what has been allocated and return
     for(i = 0; i < size; i++){
-        (*arr)[i] = malloc(NUM_RESOURCES * sizeof(int));
+        (*arr)[i] = calloc(NUM_RESOURCES, sizeof(int));
     }
     
 }
@@ -54,6 +58,30 @@ void populateMatrix(int** arr, int size){
         for(j = 0; j < NUM_RESOURCES; j++){
             arr[i][j] = rand() % 100;
         }
+    }
+}
+void populateMatrixFixed(int** arr, int size){
+    int data[5][NUM_RESOURCES] = {
+        {7,5,3},
+        {3,2,2},
+        {9,0,2},
+        {2,2,2},
+        {4,3,3},
+    };
+    for(int i = 0; i < 5; i++){
+        memcpy(arr[i], data[i], sizeof(int) * NUM_RESOURCES);
+    }
+}
+void populateMatrixAllocation(int** arr, int size){
+    int data[5][NUM_RESOURCES] = {
+        {0,1,0},
+        {2,0,0},
+        {3,0,2},
+        {2,1,1},
+        {0,0,2},
+    };
+    for(int i = 0; i < 5; i++){
+        memcpy(arr[i], data[i], sizeof(int) * NUM_RESOURCES);
     }
 }
 /* utility function to print any 2d arrays */
@@ -87,7 +115,7 @@ void* customer(void *arg){
 
 int requestResources(int customerNum, int request[]){
     int i;
-    for(i = 0; i < NUM_RESOURCES; i++){
+    for(i = 0; i < NUM_RESOURCES; ++i){
         need[customerNum][i] = need[customerNum][i] - request[i];
         allocation[customerNum][i] += request[i];
         available[i] = available[i] - request[i];
@@ -99,47 +127,84 @@ int releaseResources(int customerNum, int release[]){
     return 0;
 }
 
-int safety(number_customers){
+/* This function will make sure that a current set of processes are in a safe state, and
+finds the sequence of processes that will be safe, if possible */
+int isSafe(int** need, int** allocation, int** maximum, int number_customers){
     int m = NUM_RESOURCES;
     int n = number_customers;
     int* finish;
     int* work;
-    int i;
-    int j;
-    int k;
+    int* safeSequence;//to store the safe sequence of processes
+    int i, j, k;
+    int count = 0;
     int flag = 0;
-    //since the number of customers not known at run time, must use dynamic array
+    //all of these must be dynamic arrays
     setArraySize(&finish, n);
     setArraySize(&work, m);
-    //sets all values in finish array initially to false
-    for(i = 0; i < n; i++){
-        finish[i] = 0;
+    setArraySize(&safeSequence, n);
+    //finds the needed resources for the current processes
+    findNeed(need, allocation, maximum, number_customers);
+    //sets all values in finish array initially to false (zero)
+    bzero(finish, sizeof(int) * n);
+    memcpy(work, available, sizeof(int) * m);
+    for(i = 0; i < NUM_RESOURCES; i++){
+        printf("Available[i]: %d ", work[i]);
     }
-    for(i = 0; i < m; i++){
-        work[i] = available[i];
-    }
-    for(i = 0; i < n; i++){
-        for(j = 0; j < m; j++){
-            if(need[i][j] <= work[i] && finish[i] == 0){
-                for(k = 0; k < m; k++){
-                    work[i] += allocation[i][k];
+    printf("\n");
+    while(count < n){
+        //iterates through the need and work arrays, as long as the processes are not finished
+        for(i = 0; i < n; i++){
+            if (finish[i] == 0) {
+                for(j = 0; j < m; j++){
+                    if(need[i][j] > work[j]){
+                        break;
+                    }
+                }
+                if (j == m) {
+                    printf("Updating Work for %d\n", i);
+                    for(k = 0; k < m; k++){
+                        work[k] += allocation[i][k];
+                        printf("%d\t", work[k]);
+                    }
+                    //updates the safesequence to the current value, if it is safe
+                    safeSequence[count++] = i;
+                    printf("Count: %d\n", count);
+                    printf("\n");
                     finish[i] = 1;
+                    flag = 1;
                 }
             }
         }
     }
-    //if any processes are false, returns 1 to say that the process isn't safe
+    for(i = 0; i < n; i++){
+        printf("Safe Sequence: %d\n", safeSequence[i]);
+    }
+    
+    //if any processes are false, returns 1 to say that the state isn't safe
     for(i = 0; i < n; i++){
         if(finish[i] == 0){
             free(finish);
             free(work);
-            return 1;
+            free(safeSequence);
+            return 0;
         }
     }
     //frees the dynamically allocated finish array
     free(finish);
     free(work);
-    return 0;
+    free(safeSequence);
+    return 1;
+}
+
+void findNeed(int **need, int **allocation, int** maximum, int number_customers){
+    int n = number_customers;
+    int m = NUM_RESOURCES;
+    int i, j;
+    for(i = 0; i < n; i++){
+        for(j = 0; j < m; j++){
+            need[i][j] = maximum[i][j] - allocation[i][j];
+        }
+    }
 }
 
 int main(int argc, char *argv[]){
@@ -163,13 +228,17 @@ int main(int argc, char *argv[]){
     
     
     //setting the maximum matrix size and populating with random numbers 
+    setMatrixSize(&maximum, number_customers);
     setMatrixSize(&need, number_customers);
-    populateMatrix(need, number_customers);
-    //printMatrix(need, number_customers);
     setMatrixSize(&allocation, number_customers);
-    populateMatrix(allocation, number_customers);
-    safety(number_customers);
-    
+
+    populateMatrixFixed(maximum, number_customers);
+    populateMatrixAllocation(allocation, number_customers);
+    //populateMatrix(allocation, number_customers);
+    int safe;
+    safe = isSafe(need, allocation, maximum, number_customers);
+    printf("%s\n", safe?"it is safe": "not safe");
+
 
 
 
