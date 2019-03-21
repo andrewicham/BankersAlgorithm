@@ -1,10 +1,10 @@
-all: BankersAlg
+all: BankersAlgorithm
 
-BankersAlg: BankersAlg.c
-	gcc BankersAlg.c -lpthread -o BankersAlg
+BankersAlgorithm: BankersAlgorithm.c
+	gcc BankersAlgorithm.c -lpthread -o BankersAlgorithm
 
 clean:
-	rm -rf BankersAlg
+	rm -rf BankersAlgorithm
 
 run: 
-	./BankersAlg
+	./BankersAlgorithm
