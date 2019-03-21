@@ -169,10 +169,11 @@ int CheckSafety(int size){
             
     for(i = 0; i < number_of_customers; i++){ //if any tests fail, return -1 (not safe)
         if (finish[i] == 0){
+	    free(finish);
             return -1;
         }
     }
-
+    free(finish);
     return 0; //success
 }
 
@@ -313,6 +314,16 @@ int main(int argc, char const *argv[]){
 
     //clean up
     pthread_mutex_destroy(&mutex);
-
+    for(i = 0; i < number_of_customers; i++){
+    	free(maximum[i]);
+	free(allocation[i]);
+	free(need[i]);
+    }
+    free(maximum);
+    free(allocation);
+    free(need);
+    free(tid);
+    free(pid);
+	
     return 0;
 }
