@@ -22,7 +22,8 @@ void printMatrix();
 void printVector();
 void setMatrixSize(int ***array, int size);
 void setArraySize(int **array, int size);
-void populateMatrix(int **array, int size);
+void populateMaximum(int **maximum, int size);
+void populateAllocation(int **matrix, int size);
 
 
 //globals
@@ -103,17 +104,21 @@ int releaseResource(int customer_num, int release[]){
 
 void *customer(void* customer){
 
+    srand(time(0));
     int customer_num = *(int*)customer;
     for(j = 0; j < NUMBER_OF_RESOURCES; j++){ //loops 3 times for 3 resources
         //request//
         int request[NUMBER_OF_RESOURCES];              
         pthread_mutex_lock(&mutex); //lock thread
 
-        //need to initialize need vector randomly here//
+	
+        for(i = 0; i < NUMBER_OF_RESOURCES; i++){
+	    if(need[customer_num][i] != 0){
+	        request[i] = rand() % need[customer_num][i];
+	    }else{ request[i] = 0; }
+	}
 
         printf("Customer #%d is requesting resources:\n", customer_num);
-        
-        //print the request here//
 
         requestResource(customer_num, request); //process request
         pthread_mutex_unlock(&mutex); //unlock thread
@@ -121,12 +126,13 @@ void *customer(void* customer){
         //release//
         int release[NUMBER_OF_RESOURCES];                
         pthread_mutex_lock(&mutex); //lock thread
-        
-        //need to initialize need vector randomly here//
+        for(i = 0; i < NUMBER_OF_RESOURCES; i++){
+	    if(allocation[customer_num][i] != 0){
+	        release[i] = rand() % allocation[customer_num][i];
+	    }else{ release[i] = 0; }
+	}
 
         printf("Customer #%d is releasing resources:\n", customer_num);
-        
-        //print the release here//
 
         releaseResource(customer_num, release);
         pthread_mutex_unlock(&mutex); //unlock thread
@@ -200,7 +206,7 @@ int greaterThanAvailable(int request[]){
     return 0;
 }
 
-void printMatrix(int tempMatrix[][NUMBER_OF_RESOURCES]){
+void printMatrix(int **tempMatrix){
             
     for (i = 0; i < number_of_customers; i++){
         printf("%d: [ ", i+1);
@@ -231,12 +237,27 @@ void setMatrixSize(int ***array, int size){
 void setArraySize(int **array, int size){
     *array = calloc(size, sizeof(int));
 }
-void populateMatrix(int **array, int size){ /*SEGMENTATION FAULT */
+void populateMaximum(int **maximum, int size){
     srand(time(0));
     for(i = 0; i < size; i++){
 	for(j = 0; j < NUMBER_OF_RESOURCES; j++){
-	    array[i][j] = rand() / 10;
-	    printf("%d \n", array[i][j]);
+	    if(available[j] != 0){
+		do{
+		    maximum[i][j] = rand() % available[j];
+		}while(maximum[i][j] >= available[j]);
+	    }else{ maximum[i][j] = 0; }
+	}
+    }
+}
+void populateAllocation(int **allocation, int size){
+    srand(time(0));
+    for(i = 0; i < size; i++){
+	for(j = 0; j < NUMBER_OF_RESOURCES; j++){
+	    if(maximum[i][j] != 0){
+	    	do{
+		    allocation[i][j] = rand() % maximum[i][j];
+	    	}while(allocation[i][j] > maximum[i][j]);
+	    }else{ allocation[i][j] = 0; }
 	}
     }
 }
@@ -253,20 +274,31 @@ int main(int argc, char const *argv[]){
     setMatrixSize(&maximum, number_of_customers);
     setMatrixSize(&allocation, number_of_customers);
     setMatrixSize(&need, number_of_customers);
-    printf("I made it here #1\n");
-    populateMatrix(maximum, number_of_customers);
-    populateMatrix(allocation, number_of_customers);
-    printf("I made it here #2\n");
+
     //Setup available vector//
     for(i = 0; i < NUMBER_OF_RESOURCES; i++){
         available[i] = atoi(argv[i + 1]); //inititialize vector with user given values
     }
+
+    populateMaximum(maximum, number_of_customers);
+    populateAllocation(allocation, number_of_customers);
+
+  
     //Setup need matrix//
     for (i = 0; i < number_of_customers; i++){
         for (j = 0; j < NUMBER_OF_RESOURCES; j++){
             need[i][j] = maximum[i][j] - allocation[i][j]; //need = (max-allocation)
         }
     }
+
+    printf("Allocation Matrix:\n");
+    printMatrix(allocation);
+    printf("Available Matrix:\n");
+    printVector(available);
+    printf("Maximum Matrix:\n");
+    printMatrix(maximum);
+    printf("Need Matrix:\n");
+    printMatrix(need);
 
     
 
