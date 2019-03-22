@@ -111,10 +111,9 @@ void *customer(void* customer){
         int request[NUMBER_OF_RESOURCES];              
         pthread_mutex_lock(&mutex); //lock thread
 
-	
         for(i = 0; i < NUMBER_OF_RESOURCES; i++){
 	    if(need[customer_num][i] != 0){
-	        request[i] = rand() % need[customer_num][i];
+	        request[i] = rand() % (need[customer_num][i] + 1);
 	    }else{ request[i] = 0; }
 	}
 
@@ -126,9 +125,10 @@ void *customer(void* customer){
         //release//
         int release[NUMBER_OF_RESOURCES];                
         pthread_mutex_lock(&mutex); //lock thread
+
         for(i = 0; i < NUMBER_OF_RESOURCES; i++){
 	    if(allocation[customer_num][i] != 0){
-	        release[i] = rand() % allocation[customer_num][i];
+	        release[i] = rand() % (allocation[customer_num][i] + 1);
 	    }else{ release[i] = 0; }
 	}
 
@@ -143,32 +143,31 @@ void *customer(void* customer){
 
 int CheckSafety(int size){
 
+    int temp[NUMBER_OF_RESOURCES];
     int *finish;
     setArraySize(&finish, size);
-    //initialize Work=Available
-    int work[NUMBER_OF_RESOURCES];
 
     for(i = 0; i < NUMBER_OF_RESOURCES; i++){
-        work[i] = available[i];
+        temp[i] = available[i];
     }
     for(i = 0; i < number_of_customers; i++){
-        if(finish[i] == 0){
+        if(!finish[i]){
             for(j = 0; j < NUMBER_OF_RESOURCES; j++){
-                if(need[i][j] <= work[j] && finish[i] == 0){
+                if(temp[j] >= need[i][j] && !finish[i]){
                     if(j == (NUMBER_OF_RESOURCES - 1)){
                         for (k = 0; k < NUMBER_OF_RESOURCES; k++){
-                            work[k] += allocation[i][k];                                                                  
+                            temp[k] += allocation[i][k];                                                                  
                         }
                         finish[i] = 1;                                                             
-                        i = -1;
                     }
                 }
+	    
             }
         }
     }
             
     for(i = 0; i < number_of_customers; i++){ //if any tests fail, return -1 (not safe)
-        if (finish[i] == 0){
+        if (!finish[i]){
 	    free(finish);
             return -1;
         }
@@ -246,7 +245,7 @@ void populateMaximum(int **maximum, int size){
 		do{
 		    maximum[i][j] = rand() % available[j];
 		}while(maximum[i][j] >= available[j]);
-	    }else{ maximum[i][j] = 0; }
+	    }else{ maximum[i][j] = 0; } //has to be 0 if available is 0
 	}
     }
 }
@@ -257,8 +256,8 @@ void populateAllocation(int **allocation, int size){
 	    if(maximum[i][j] != 0){
 	    	do{
 		    allocation[i][j] = rand() % maximum[i][j];
-	    	}while(allocation[i][j] > maximum[i][j]);
-	    }else{ allocation[i][j] = 0; }
+	    	}while(allocation[i][j] >= maximum[i][j]);
+	    }else{ allocation[i][j] = 0; } //has to be 0 if maximum is 0
 	}
     }
 }
@@ -270,6 +269,9 @@ int main(int argc, char const *argv[]){
 
     pthread_t *tid = malloc(sizeof(pthread_t) * number_of_customers); //thread ID
     int *pid = malloc(sizeof(int) * number_of_customers); //process ID
+    for(i = 0; i < number_of_customers; i++){
+	pid[i] = i;
+    }
     pthread_mutex_init(&mutex, NULL); //mutex init
     
     setMatrixSize(&maximum, number_of_customers);
@@ -292,6 +294,7 @@ int main(int argc, char const *argv[]){
         }
     }
 
+    printf("Sizing Matrices and Initiating Values\n");
     printf("Allocation Matrix:\n");
     printMatrix(allocation);
     printf("Available Matrix:\n");
@@ -301,15 +304,12 @@ int main(int argc, char const *argv[]){
     printf("Need Matrix:\n");
     printMatrix(need);
 
-    
-
     //Setup threads//
     for(i = 0; i < number_of_customers; i++){ //create threads
-        *(pid + i) = i;
-        pthread_create((tid + i), NULL, customer, (pid + i));
+        pthread_create((tid+i), NULL, customer, (pid+i));
     }
     for(i = 0; i < number_of_customers; i++){ //join threads
-        pthread_join(*(tid + i),NULL);
+        pthread_join(tid[i],NULL);
     }
 
     //clean up
@@ -327,3 +327,4 @@ int main(int argc, char const *argv[]){
 	
     return 0;
 }
+
